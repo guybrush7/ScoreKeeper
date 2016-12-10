@@ -12,13 +12,22 @@
 
 AccController ac;
 
+enum state_t {IDLE=0, ARMED, TRIGGERED};
+
+state_t state;
+
+uint8_t hText1;
+uint8_t hText2;
+uint8_t hText3;
+
+bool uiIsReady = false;
+
 
 void setup() {
 	// put your setup code here, to run once:
 
 	SimbleeForMobile.deviceName = "ScoreKeeper";
 	SimbleeForMobile.begin();
-
 
 	Serial.begin(9600);
 
@@ -27,32 +36,87 @@ void setup() {
 	
 	ac.Init(1);
 	ac.Reset();
-	ac.Start();
+	//ac.Start();
+	state = IDLE;
 
 
 }
 
+char str[40];
+
 void loop() {
 	// put your main code here, to run repeatedly:
+	
+	SimbleeForMobile.process();
+	
+	if (!uiIsReady)
+		return;
+	
+	if (state == IDLE)
+	{
+		ac.Start();
+		SimbleeForMobile.updateText(hText3,"Ready");
+	}
+	
 	
 	if (ac.Ready())
 	{
 		delay(10);
 		ac.ReadSamples();
+		ac.Stop();
 		
 		if (ac.fifo[0].valid)
-			printSample(0);
+		{
+			//printSample(0);
+			ac.getLimits();
+			//printLimits(0);
+			state = TRIGGERED;
+		}
+		else
+			state = IDLE;
 		
-		ac.Reset();
+		//ac.Reset();
 	}
+	
+	
+	
+	if (state == TRIGGERED)
+	{
+		SimbleeForMobile.updateText(hText3,"Triggered");
 		
+		sprintf(str, "%4d %4d %4d", (int)ac.lim[0].xMin*10, (int)ac.lim[0].yMin*10, (int)ac.lim[0].zMin*10);
+		SimbleeForMobile.updateText(hText1, str);
+		sprintf(str, "%4d %4d %4d", (int)ac.lim[0].xMax*10, (int)ac.lim[0].yMax*10, (int)ac.lim[0].zMax*10);
+		SimbleeForMobile.updateText(hText2, str);
+	
+	}
+	
 	
 	delay(250);
 	
-	//SimbleeForMobile.process();
 }
 
 
+void printLimits(int ch)
+{
+	Serial.print("x: ");
+	Serial.print(ac.lim[ch].xMin);
+	Serial.print(" ");
+	Serial.print(ac.lim[ch].xMax);
+	Serial.println("");
+	Serial.print("y: ");
+	Serial.print(ac.lim[ch].yMin);
+	Serial.print(" ");
+	Serial.print(ac.lim[ch].yMax);
+	Serial.println("");
+	Serial.print("z: ");
+	Serial.print(ac.lim[ch].zMin);
+	Serial.print(" ");
+	Serial.print(ac.lim[ch].zMax);
+	Serial.println("");
+}
+
+/*
 void printSample(int ch)
 {
 	int i;
@@ -65,6 +129,7 @@ void printSample(int ch)
 	
 	Serial.println("");
 }
+*/
 
 int currentScreen = -1;
 
@@ -99,38 +164,40 @@ void ui_event(event_t &event)
 
 }
 
-uint8_t hText;
 uint8_t hButton;
 
 int count = 0;
 
 void createMainScreen()
 {
-  SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
+	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
 
-  hText = SimbleeForMobile.drawText(10, 50, "Text here");
+	hText1 = SimbleeForMobile.drawText(10, 50, "min");
+	hText2 = SimbleeForMobile.drawText(10, 80, "max");
+	hText3 = SimbleeForMobile.drawText(10, 110, "Status");
 
-  hButton = SimbleeForMobile.drawButton(10, 80, 100, "Do", GREEN, BOX_TYPE);
-
-
-  SimbleeForMobile.setEvents(hButton, EVENT_RELEASE);
-
-  SimbleeForMobile.endScreen();
+	hButton = SimbleeForMobile.drawButton(10, 150, 100, "Rearm", GREEN, BOX_TYPE);
 
 
+	SimbleeForMobile.setEvents(hButton, EVENT_RELEASE);
+
+	SimbleeForMobile.endScreen();
+
+	uiIsReady = true;
 }
 
 void handleMainScreenEvents(event_t &event)
 {
-  char str[20];
   
-  if (event.id == hButton && event.type == EVENT_RELEASE)
-  {
-    count += 1;
-    sprintf(str, "cnt=%d", count);
-    SimbleeForMobile.updateText(hText,str);
+	if (event.id == hButton && event.type == EVENT_RELEASE)
+	{
+		//count += 1;
+		//sprintf(str, "cnt=%d", count);
+		//SimbleeForMobile.updateText(hText,str);
+		
+		state = IDLE;
 	
- }
+	}
 }
 
 
