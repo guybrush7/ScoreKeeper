@@ -1,8 +1,10 @@
+// ScoreKeeper
+
 #include <SimbleeForMobile.h>
 
 //#include "SparkFun_ADXL345.h"
 #include "controller.h"
-
+#include "ui_handles.h"
 
 #define MAIN_SCREEN 1
 
@@ -10,7 +12,7 @@
 //ADXL345 *acc[4];
 //ADXL345 *ch1;
 
-AccController ac;
+//AccController ac;
 
 enum state_t {IDLE=0, ARMED, TRIGGERED};
 
@@ -27,6 +29,7 @@ void setup() {
 	// put your setup code here, to run once:
 
 	SimbleeForMobile.deviceName = "ScoreKeeper";
+	SimbleeForMobile.txPowerLevel = 4;
 	SimbleeForMobile.begin();
 
 	Serial.begin(9600);
@@ -143,7 +146,7 @@ void ui()
   switch (currentScreen)
   {
     case MAIN_SCREEN:
-      createMainScreen();
+      createMain1Screen();
       break;
       
   }
@@ -159,16 +162,53 @@ void ui_event(event_t &event)
       break;
   }
 
-
-
-
 }
+
+
+const char * const playerSegmentNames[4] = {"1", "2", "3", "4"};
+
+void createMainScreen()
+{
+	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
+	
+	bMainTest = SimbleeForMobile.drawButton(30,10, 150, "Test", BLUE, BOX_TYPE);
+	bMainGame = SimbleeForMobile.drawButton(30,40, 150, "Start Game", BLUE, BOX_TYPE);
+	
+	segMainPlayers = SimbleeForMobile.drawSegment(30, 80, 400, playerSegmentNames, 4);
+	//updateValue(segMainPlayers, DEFAULT_PLAYERS);
+	
+	stepMainShots = SimbleeForMobile.drawStepper(30, 110, 100, MIN_SHOTS, MAX_SHOTS, BLACK);
+	stepMainRounds = SimbleeForMobile.drawStepper(30, 140, 100, MIN_ROUNDS, MAX_ROUNDS, BLACK);
+	//updateValue(stepMainShots, DEFAULT_SHOTS);
+	//updateValue(stepMainRounds, DEFAULT_ROUNDS);
+
+	sprintf(str, "%d", DEFAULT_SHOTS);
+	txtMainShots = SimbleeForMobile.drawText(150, 110, str, RED);
+	
+	sprintf(str, "%d", DEFAULT_ROUNDS);
+	txtMainRounds = SimbleeForMobile.drawText(150, 110, str, RED);
+	
+	// set callbacks
+	SimbleeForMobile.setEvents(bMainTest, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(bMainGame, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(segMainPlayers, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(stepMainShots, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(stepMainRounds, EVENT_RELEASE);
+	
+
+	SimbleeForMobile.endScreen();
+	
+	uiIsReady = true;
+}
+
+
+
 
 uint8_t hButton;
 
 int count = 0;
 
-void createMainScreen()
+void createMain1Screen()
 {
 	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
 
