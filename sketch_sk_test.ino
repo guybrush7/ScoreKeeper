@@ -4,9 +4,15 @@
 
 //#include "SparkFun_ADXL345.h"
 #include "controller.h"
+#include "manager.h"
 #include "ui_handles.h"
 
 #define MAIN_SCREEN 1
+#define GAME_SCREEN 2
+#define TEST_SCREEN 3
+
+
+#define DARK_YELLOW ((color_t)0xAAAA00)
 
 //const int ch1_cs_pin = 6;
 //ADXL345 *acc[4];
@@ -14,7 +20,9 @@
 
 //AccController ac;
 
-enum state_t {IDLE=0, ARMED, TRIGGERED};
+GameManager gm;
+
+enum state_t {AIDLE=0, ARMED, TRIGGERED};
 
 state_t state;
 
@@ -25,7 +33,8 @@ uint8_t hText3;
 bool uiIsReady = false;
 
 
-void setup() {
+void setup() 
+{
 	// put your setup code here, to run once:
 
 	SimbleeForMobile.deviceName = "ScoreKeeper";
@@ -35,17 +44,397 @@ void setup() {
 	Serial.begin(9600);
 
 	Serial.println("Starting");
-	Serial.println("Build: 12/3/16");
+	Serial.println("Build: 12/19/16");
 	
-	ac.Init(1);
-	ac.Reset();
+	//ac.Init(1);
+	//ac.Reset();
 	//ac.Start();
-	state = IDLE;
+	//state = AIDLE;
+	
+	gm.Init();
 
 
 }
 
 char str[40];
+
+void loop() {
+	// put your main code here, to run repeatedly:
+	
+	SimbleeForMobile.process();
+	
+	if (!uiIsReady)
+		return;
+	
+	// manage game
+	gm.Loop();
+	
+	// handle ui updates
+	if (gm.state.uiUpdateReq)
+	{
+		updateGameScreen();
+		gm.state.uiUpdateReq = false;
+	}
+	
+	
+	
+	delay(10);
+	
+}
+
+void updateGameScreen(void)
+{
+	/*
+	Serial.print("txtGameHist = ");
+	Serial.print(txtGameHits);
+	Serial.print("\n");
+	Serial.print("bGameNextPlayer = ");
+	Serial.print(bGameNextPlayer);
+	Serial.print("\n");
+	*/
+
+	// update elements
+	sprintf(str, "Round: %d", gm.state.curRound+1);
+	SimbleeForMobile.updateText(txtGameRound, str);
+	sprintf(str, "Player: %d", gm.state.curPlayer+1);
+	SimbleeForMobile.updateText(txtGamePlayer, str);
+	sprintf(str, "Shots hit: %d", gm.state.nHitsThisPlayer);
+	SimbleeForMobile.updateText(txtGameHits, str);
+	sprintf(str, "Round score: %d", gm.state.curPoints);
+	SimbleeForMobile.updateText(txtGameScore, str);
+	
+	for (int i = 0; i<gm.cfg.nPlayer; i++)
+	{
+		sprintf(str, "Player %d: %d", i+1, gm.state.totalPoints[i]);
+		SimbleeForMobile.updateText(txtGamePlayerScore[i], str);
+	}
+	
+	/*
+	Serial.print("Update UI: shot = ");
+	Serial.print(gm.shot);
+	Serial.println("");
+	*/
+	// mode
+	if (gm.mode == GAMEOVER)
+	{
+		SimbleeForMobile.updateText(txtGameStatus, "Game Over");
+		SimbleeForMobile.updateColor(txtGameStatus, BLUE);
+	}
+	else if (gm.shot == WAIT)
+	{
+		SimbleeForMobile.updateText(txtGameStatus, "SHOOT");
+		SimbleeForMobile.updateColor(txtGameStatus, GREEN);
+	}
+	else if (gm.shot == TIMEOUT)
+	{
+		SimbleeForMobile.updateText(txtGameStatus, "WAIT");
+		SimbleeForMobile.updateColor(txtGameStatus, RED);
+	}
+	else if (gm.shot == PAUSED)
+	{
+		SimbleeForMobile.updateText(txtGameStatus, "PAUSED");
+		SimbleeForMobile.updateColor(txtGameStatus, DARK_YELLOW);
+	}
+
+}
+
+
+int currentScreen = -1;
+
+void ui()
+{
+	if (SimbleeForMobile.screen == currentScreen)
+		return;
+
+	currentScreen = SimbleeForMobile.screen;
+
+	switch (currentScreen)
+	{
+	case MAIN_SCREEN:
+		createMainScreen();
+		break;
+	case GAME_SCREEN:
+		createGameScreen();
+		break;
+	case TEST_SCREEN:
+		createTestScreen();
+		break;
+  
+	}
+  
+}
+
+void ui_event(event_t &event)
+{
+	switch(currentScreen)
+	{
+	case MAIN_SCREEN:
+		handleMainScreenEvents(event);
+		break;
+	case GAME_SCREEN:
+		handleGameScreenEvents(event);
+		break;
+	case TEST_SCREEN:
+		handleTestScreenEvents(event);
+		break;
+		
+	}
+
+}
+
+
+int uiPlayer = DEFAULT_PLAYERS;
+int uiShots = DEFAULT_SHOTS;
+int uiRounds = DEFAULT_ROUNDS;
+
+
+uint8_t bShot1;
+
+
+const char * const playerSegmentNames[4] = {"1", "2", "3", "4"};
+
+void createMainScreen()
+{
+	int ytop = 0;
+
+	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
+	
+	ytop += 30;
+	bMainTest = SimbleeForMobile.drawButton(30,ytop, 150, "Test", BLUE, BOX_TYPE);
+	ytop += 60;
+	bMainGame = SimbleeForMobile.drawButton(30,ytop, 150, "Start Game", BLUE, BOX_TYPE);
+	
+	ytop += 60;
+	txtMainShots = SimbleeForMobile.drawText(30, ytop, "Players:", RED, 16);
+
+	ytop += 40;
+	segMainPlayers = SimbleeForMobile.drawSegment(30, ytop, 250, playerSegmentNames, 4, BLACK);
+	SimbleeForMobile.updateValue(segMainPlayers, uiPlayer-1);
+	
+	ytop += 60;
+	stepMainShots = SimbleeForMobile.drawStepper(30, ytop, 100, MIN_SHOTS, MAX_SHOTS, BLACK);
+	sprintf(str, "%d shots", uiShots);
+	txtMainShots = SimbleeForMobile.drawText(150, ytop, str, RED, 32);
+	SimbleeForMobile.updateValue(stepMainShots, uiShots);
+
+	ytop += 70;
+	stepMainRounds = SimbleeForMobile.drawStepper(30, ytop, 100, MIN_ROUNDS, MAX_ROUNDS, BLACK);
+	sprintf(str, "%d rounds", uiRounds);
+	txtMainRounds = SimbleeForMobile.drawText(150, ytop, str, RED, 32);
+	SimbleeForMobile.updateValue(stepMainRounds, uiRounds);
+	
+	
+	// set callbacks
+	// these don't seem to have the desired effect
+	SimbleeForMobile.setEvents(bMainTest, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(bMainGame, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(segMainPlayers, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(stepMainShots, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(stepMainRounds, EVENT_RELEASE);
+
+	SimbleeForMobile.endScreen();
+	
+	uiIsReady = true;
+}
+
+
+void createGameScreen()
+{
+	int ytop = 0;
+	
+
+	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
+	
+	
+	ytop += 30;
+	bGameNextPlayer = SimbleeForMobile.drawButton(30,ytop, 150, "Shots Complete", BLUE, BOX_TYPE);
+	bGamePause = SimbleeForMobile.drawButton(230, ytop, 50, "Pause", DARK_YELLOW, BOX_TYPE);
+	
+	ytop += 60;
+	sprintf(str, "Round: %d", gm.state.curRound);
+	txtGameRound = SimbleeForMobile.drawText(30, ytop, str, BLACK, 20);
+	
+	ytop += 40;
+	sprintf(str, "Player: %d", gm.state.curPlayer+1);
+	txtGamePlayer = SimbleeForMobile.drawText(30, ytop, str, RED, 20);
+
+	ytop += 40;
+	sprintf(str, "Shots hit: %d", gm.state.nHitsThisPlayer);
+	txtGameHits = SimbleeForMobile.drawText(30, ytop, str, BLACK, 20);
+	
+	ytop += 40;
+	sprintf(str, "Round score: %d", gm.state.curPoints);
+	txtGameScore = SimbleeForMobile.drawText(30, ytop, str, BLUE, 20);
+	ytop += 20;
+	
+	Serial.print("init players: ");
+	Serial.print(gm.cfg.nPlayer);
+	Serial.print("\n");
+	// If this is variable, the IDs change, but the reported event ids don't
+	bool isPlaying;
+	for (int i = 0; i<MAX_PLAYERS; i++)
+	{
+		ytop += 30;
+		sprintf(str, "Player %d: %d", i+1, gm.state.totalPoints[i]);
+		txtGamePlayerScore[i] = SimbleeForMobile.drawText(30, ytop, str, BLACK, 18);
+		isPlaying = (i < gm.cfg.nPlayer);
+		SimbleeForMobile.setVisible(txtGamePlayerScore[i], isPlaying);
+	}
+	
+	ytop += 50;
+	txtGameStatus = SimbleeForMobile.drawText(30, ytop, "Starting", RED, 32);
+		
+	ytop += 60;
+	bGameEnd = SimbleeForMobile.drawButton(30,ytop, 150, "End Game", BLACK, BOX_TYPE);
+	
+	
+	
+	// set callbacks
+	// these don't seem to have the desired effect
+	SimbleeForMobile.setEvents(bGameNextPlayer, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(bGameEnd, EVENT_RELEASE);
+	SimbleeForMobile.setEvents(bGamePause, EVENT_RELEASE);
+
+	SimbleeForMobile.endScreen();
+	
+	uiIsReady = true;
+}
+
+void createTestScreen()
+{
+	int ytop = 0;
+
+	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
+	
+
+	SimbleeForMobile.endScreen();
+	
+	uiIsReady = true;
+}
+
+
+
+void handleMainScreenEvents(event_t &event)
+{
+	Serial.print("event ");
+	Serial.print(event.id);
+	Serial.print(" ");
+	Serial.print("type ");
+	Serial.print(event.type);
+	Serial.print("\n");
+	
+	if (event.id == bMainTest && event.type == EVENT_RELEASE)
+	{
+		Serial.print("Start test\n");
+		SimbleeForMobile.showScreen(TEST_SCREEN);
+		uiIsReady = false;
+	}
+	else if (event.id == bMainGame && event.type == EVENT_RELEASE)
+	{
+		Serial.print("Start game\n");
+		
+		// get config
+		gameConfig cfg;
+		cfg.nPlayer = uiPlayer;
+		cfg.nShots = uiShots;
+		cfg.nRounds = uiRounds;
+		
+		// make sure to init gm before changing screens		
+		gm.EnterGame(cfg);
+		
+		SimbleeForMobile.showScreen(GAME_SCREEN);
+		uiIsReady = false;
+		
+	}
+	else if (event.id == segMainPlayers)// && event.type == EVENT_PRESS)
+	{
+		uiPlayer = event.value + 1;
+		Serial.print("Players: ");
+		Serial.print(uiPlayer);
+		Serial.print("\n");
+	}
+	else if (event.id == stepMainShots)// && event.type == EVENT_PRESS)
+	{
+		uiShots = event.value;
+		sprintf(str, "%d shots", uiShots);
+		SimbleeForMobile.updateText(txtMainShots, str);
+		
+		Serial.print("Shots: ");
+		Serial.print(uiShots);
+		Serial.print("\n");
+
+	}
+	else if (event.id == stepMainRounds)// && event.type == EVENT_PRESS)
+	{
+		uiRounds = event.value;
+		sprintf(str, "%d rounds", uiRounds);
+		SimbleeForMobile.updateText(txtMainRounds, str);
+
+		Serial.print("Rounds: ");
+		Serial.print(uiRounds);
+		Serial.print("\n");
+	}
+
+
+	
+}
+
+void handleGameScreenEvents(event_t &event)
+{
+	Serial.print("game event ");
+	Serial.print(event.id);
+	Serial.print(" ");
+	Serial.print("type ");
+	Serial.print(event.type);
+	Serial.print("\n");
+	Serial.print("bGameEnd = ");
+	Serial.print(bGameEnd);
+	Serial.print("\n");
+	
+	if (event.id == bGameNextPlayer && event.type == EVENT_RELEASE)
+	{
+		Serial.print("Finish player round\n");
+		gm.EndPlayer();
+		
+	}
+	else if (event.id == bGameEnd && event.type == EVENT_RELEASE)
+	{
+		Serial.print("Exit game\n");
+		gm.ExitMode();
+		SimbleeForMobile.showScreen(MAIN_SCREEN);
+		uiIsReady = false;
+
+	}
+	else if (event.id == bGamePause && event.type == EVENT_RELEASE)
+	{
+		gm.TogglePause();
+	}
+	
+	
+}
+
+
+void handleTestScreenEvents(event_t &event)
+{
+	
+	if (event.id == bGameNextPlayer && event.type == EVENT_RELEASE)
+	{
+		//SimbleeForMobile.showScreen(TEST_SCREEN);
+	}
+	else if (event.id == bGameEnd && event.type == EVENT_RELEASE)
+	{
+		gm.ExitMode();
+		SimbleeForMobile.showScreen(MAIN_SCREEN);
+		uiIsReady = false;
+
+	}
+	
+	
+}
+
+
+
+/*
 
 void loop() {
 	// put your main code here, to run repeatedly:
@@ -119,6 +508,8 @@ void printLimits(int ch)
 	Serial.println("");
 }
 
+*/
+
 /*
 void printSample(int ch)
 {
@@ -134,80 +525,7 @@ void printSample(int ch)
 }
 */
 
-int currentScreen = -1;
-
-void ui()
-{
-  if (SimbleeForMobile.screen == currentScreen)
-    return;
-  
-  currentScreen = SimbleeForMobile.screen;
-
-  switch (currentScreen)
-  {
-    case MAIN_SCREEN:
-      createMain1Screen();
-      break;
-      
-  }
-  
-}
-
-void ui_event(event_t &event)
-{
-  switch(currentScreen)
-  {
-    case MAIN_SCREEN:
-      handleMainScreenEvents(event);
-      break;
-  }
-
-}
-
-
-const char * const playerSegmentNames[4] = {"1", "2", "3", "4"};
-
-void createMainScreen()
-{
-	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
-	
-	bMainTest = SimbleeForMobile.drawButton(30,10, 150, "Test", BLUE, BOX_TYPE);
-	bMainGame = SimbleeForMobile.drawButton(30,40, 150, "Start Game", BLUE, BOX_TYPE);
-	
-	segMainPlayers = SimbleeForMobile.drawSegment(30, 80, 400, playerSegmentNames, 4);
-	//updateValue(segMainPlayers, DEFAULT_PLAYERS);
-	
-	stepMainShots = SimbleeForMobile.drawStepper(30, 110, 100, MIN_SHOTS, MAX_SHOTS, BLACK);
-	stepMainRounds = SimbleeForMobile.drawStepper(30, 140, 100, MIN_ROUNDS, MAX_ROUNDS, BLACK);
-	//updateValue(stepMainShots, DEFAULT_SHOTS);
-	//updateValue(stepMainRounds, DEFAULT_ROUNDS);
-
-	sprintf(str, "%d", DEFAULT_SHOTS);
-	txtMainShots = SimbleeForMobile.drawText(150, 110, str, RED);
-	
-	sprintf(str, "%d", DEFAULT_ROUNDS);
-	txtMainRounds = SimbleeForMobile.drawText(150, 110, str, RED);
-	
-	// set callbacks
-	SimbleeForMobile.setEvents(bMainTest, EVENT_RELEASE);
-	SimbleeForMobile.setEvents(bMainGame, EVENT_RELEASE);
-	SimbleeForMobile.setEvents(segMainPlayers, EVENT_RELEASE);
-	SimbleeForMobile.setEvents(stepMainShots, EVENT_RELEASE);
-	SimbleeForMobile.setEvents(stepMainRounds, EVENT_RELEASE);
-	
-
-	SimbleeForMobile.endScreen();
-	
-	uiIsReady = true;
-}
-
-
-
-
-uint8_t hButton;
-
-int count = 0;
-
+/*
 void createMain1Screen()
 {
 	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
@@ -226,6 +544,8 @@ void createMain1Screen()
 	uiIsReady = true;
 }
 
+
+
 void handleMainScreenEvents(event_t &event)
 {
   
@@ -235,10 +555,14 @@ void handleMainScreenEvents(event_t &event)
 		//sprintf(str, "cnt=%d", count);
 		//SimbleeForMobile.updateText(hText,str);
 		
-		state = IDLE;
+		state = AIDLE;
 	
 	}
 }
+
+
+
+*/
 
 
 

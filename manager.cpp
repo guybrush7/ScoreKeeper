@@ -1,10 +1,17 @@
 
 
+#include "manager.h"
+
+
+int targetValue[NUM_TARGETS] = {1, 2, 3, 2};
+int missValue = -1;
+
 
 
 GameManager::GameManager()
 {
 	mode = IDLE;
+	shot = DISABLED;
 	accelActive = false;
 	
 }
@@ -13,15 +20,20 @@ void GameManager::Init(void)
 {
 	ac.Init(1);
 	ac.Reset();
-
+	
 	
 	
 	
 }
 
-void GameManager::EnterGame(gameConfig cfg)
+gameState GameManager::GetState(void)
 {
-	gamecfg = cfg;
+	return state;
+}
+
+void GameManager::EnterGame(gameConfig initcfg)
+{
+	cfg = initcfg;
 	mode = GAME;
 	
 	// init game state
@@ -32,7 +44,7 @@ void GameManager::EnterGame(gameConfig cfg)
 		state.totalPoints[i] = 0;
 	
 	InitRound();
-		
+	
 	shot = WAIT;
 
 }
@@ -50,15 +62,15 @@ void GameManager::ExitMode(void)
 
 void GameManager::InitRound(void)
 {
-	curPlayer = 0;
+	state.curPlayer = 0;
 	
 	InitPlayer();
 }
 
 void GameManager::InitPlayer(void)
 {
-	nHitsThisPlayer = 0;
-	curPoints = 0;
+	state.nHitsThisPlayer = 0;
+	state.curPoints = 0;
 }
 
 void GameManager::FinishPlayer(void)
@@ -73,12 +85,12 @@ void GameManager::FinishPlayer(void)
 		state.curPoints += (nMiss * missValue);
 
 	// Add current score to total
-	state.totalPoints[curPlayer] += state.curPoints;
+	state.totalPoints[state.curPlayer] += state.curPoints;
 
 	// next player
-	curPlayer += 1;
+	state.curPlayer += 1;
 	
-	if (curPlayer >= cfg.nPlayer)
+	if (state.curPlayer >= cfg.nPlayer)
 	{
 		// round over
 		FinishRound();
@@ -93,17 +105,25 @@ void GameManager::FinishPlayer(void)
 void GameManager::FinishRound(void)
 {
 	// next round
-	curRound += 1;
+	state.curRound += 1;
 	
 	// Is the game over?
-	if (curRound >= cfg.nRounds)
+	if (state.curRound >= cfg.nRounds)
 	{
+		// hold player/round at final value
+		state.curRound = cfg.nRounds-1;
+		state.curPlayer = cfg.nPlayer-1;
+		
+		// set mode
 		mode = GAMEOVER;
+		
+		// stop monitoring shots
+		shot = DISABLED;
 	}
 	else
 	{
 		// start over at player 0
-		curPlayer = 0;
+		state.curPlayer = 0;
 		InitRound();
 	}
 	
@@ -113,33 +133,146 @@ void GameManager::FinishRound(void)
 // Called when a user touches the end round (player) button
 void GameManager::EndPlayer()
 {
+	if (mode == GAMEOVER)
+		return;
+		
 	FinishPlayer();
+	state.uiUpdateReq = true;
 }
 
 
 // 
 bool GameManager::CheckForShot(void)
 {
-	
-	
-	
+	// Check if any interrupt has occured
+	if (ac.Ready())
+	{
+		// wait to finish collecting
+		delay(10);
+		// Read the samples out of the FIFO
+		ac.ReadSamples();
+		// Stop collecting
+		// May have triggered again by now?
+		ac.Stop();
+		
+		// Get all limits
+		ac.getLimits();
+		
+		// clear out
+		ac.Reset();
+		
+		// stop watching
+		accelActive = false;
+		
+		return true;
+	}
+		
+	return false;
 	
 }
 
 
 void GameManager::Loop(void)
 {
+	// If we are Idle, make sure we are stopped
+	if (shot == DISABLED)
+		if (accelActive)
+		{
+			ac.Stop();
+			accelActive = false;
+		}
 	
-	// 
+	// Waiting for shot
+	if (shot == WAIT)
+	{
+		// If we aren't listening, start
+		if (!accelActive)
+		{
+			// clear to be safe
+			ac.Stop();
+			// Start up
+			ac.Start();
+			
+			accelActive = true;
+		}
+		else
+		{
+			// already listening, check on hit
+			if (CheckForShot())
+			{
+				// got a hit
+				if (mode == GAME)
+				{
+					ScoreHit();
+					state.uiUpdateReq = true;
+				}
+				
+				// Start timeout
+				shot = TIMEOUT;
+			}
+		}
+	}
 	
+	// Wait for timer to complete
+	if (shot == TIMEOUT)
+	{
+		// check for expired timer
+		if (1)
+		{
+			shot = WAIT;
+		}
+	}
 	
+	// If paused, make sure to stop accel
+	if (shot == PAUSED)
+	{
+		if (accelActive)
+		{
+			ac.Stop();
+			accelActive = false;
+		}
+	}
 	
 	
 	
 }
 
 
+void GameManager::ScoreHit(void)
+{
+	int hitScore = 0;
+	
+	if (ac.chMaxIdx >= 0)
+	{
+		// score shot
+		hitScore = targetValue[ac.chMaxIdx];
+		
+		// add to total
+		state.curPoints += hitScore;
+		state.nHitsThisPlayer += 1;
+	}
+	
+}
 
+
+void GameManager::TogglePause(void)
+{
+	if (mode == GAMEOVER)
+		return;
+	
+	if (shot == PAUSED)
+	{
+		Serial.println("Pause off");
+		shot = WAIT;
+		state.uiUpdateReq = true;
+	}
+	else if (shot == WAIT)
+	{
+		Serial.println("Pause on");
+		shot = PAUSED;
+		state.uiUpdateReq = true;
+	}
+}
 
 
 

@@ -1,11 +1,14 @@
 
+#ifndef _MANAGER_H
+#define _MANAGER_H
+
 
 #include "controller.h"
 
 
-enum gameMode {IDLE = 0; TEST, GAME, GAMEOVER};
+enum gameMode {IDLE = 0, TEST, GAME, GAMEOVER};
 
-enum shotState {IDLE = 0; WAIT; TIMEOUT; PAUSE};
+enum shotState {DISABLED = 0, WAIT, TIMEOUT, PAUSED};
 
 #define MAX_PLAYERS		4
 #define MAX_ROUNDS		10
@@ -19,8 +22,6 @@ enum shotState {IDLE = 0; WAIT; TIMEOUT; PAUSE};
 #define DEFAULT_ROUNDS	5
 #define DEFAULT_SHOTS	10
 
-int targetValue[NUM_TARGETS] = {1, 2, 3, 2};
-int missValue = -1;
 
 
 struct gameState
@@ -48,21 +49,26 @@ public:
 	void Init(void);
 	
 	// User input
-	void EnterGame(gameConfig cfg);
+	void EnterGame(gameConfig initcfg);
 	void ExitMode();
 	void EnterTest();
 	void EndPlayer();
 	
+	// update ui
+	gameState GetState(void);
+	
 	void Loop();
+	
+	void TogglePause(void);
 	
 	
 	gameState state;
 	shotState shot;
+	gameConfig cfg;
+	gameMode mode;
 	
 private:
 	
-	gameConfig gamecfg;
-	gameMode mode;
 	
 	AccController ac;
 	
@@ -74,10 +80,12 @@ private:
 	
 	bool CheckForShot(void);
 	
+	void ScoreHit(void);
+	
 	bool accelActive;
 
 
 };
 
-
+#endif
 
