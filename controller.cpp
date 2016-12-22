@@ -8,7 +8,8 @@ const double gainCorrection = (double)accelRange/2.0;
 const uint8_t activityThresh = 48;
 const uint8_t accelMeasRate = ADXL345_BW_1600;
 
-const int CS_PINS[4] = {6, 10, 11, 12};
+//const int CS_PINS[4] = {6, 10, 11, 12};
+const int CS_PINS[4] = {2, 14, 13, 10};
 
 
 
