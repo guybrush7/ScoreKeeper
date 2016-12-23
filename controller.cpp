@@ -12,6 +12,11 @@ const uint8_t accelMeasRate = ADXL345_BW_1600;
 const int CS_PINS[4] = {2, 14, 13, 10};
 
 
+// SPI pins:
+// MISO - 3
+// SCK  - 4
+// MOSI - 5
+
 
 
 AccController::AccController()
@@ -112,9 +117,12 @@ bool AccController::Ready(void)
 	int i;
 	
 	for (i=0; i<nAcc; i++)
+	{
 		interrupts = acc[i]->getInterruptSource();
 		if (acc[i]->triggered(interrupts, ADXL345_ACTIVITY))
 			res = true;
+		delay(1);
+	}
 	
 	return res;
 }
@@ -134,8 +142,9 @@ void AccController::ReadSamples(void)
 		
 		fifo[i].valid = triggered;
 		
-		Serial.println("Act trigger");
-		Serial.print("Trig = ");
+		Serial.print("Act trigger #");
+		Serial.print(i);
+		Serial.print(", trig = ");
 		Serial.print((int)triggered);
 		Serial.print(", entries = ");
 		Serial.print(nSamples);
@@ -172,6 +181,9 @@ void AccController::ReadSamples(void)
 				//fifo[i].samp[j] = (float)Gmag;
 			}
 		}
+		
+		// wait a bit
+		delay(1);
 	}
 }
 
@@ -241,6 +253,13 @@ void AccController::getLimits(void)
 				chMaxIdx = i;
 			}
 		}
+		
+		Serial.print("Ch");
+		Serial.print(i);
+		Serial.print(": max = ");
+		Serial.print(lim[i].absMax);
+		Serial.println("");		
+		
 	}
 }
 

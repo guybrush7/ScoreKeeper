@@ -18,7 +18,7 @@ GameManager::GameManager()
 
 void GameManager::Init(void)
 {
-	ac.Init(1);
+	ac.Init(4);
 	ac.Reset();
 	
 	
@@ -57,6 +57,7 @@ void GameManager::EnterTest(void)
 void GameManager::ExitMode(void)
 {
 	mode = IDLE;
+	shot = DISABLED;
 }
 
 
