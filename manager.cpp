@@ -18,6 +18,9 @@ GameManager::GameManager()
 
 void GameManager::Init(void)
 {
+	ac.SPI_Init();
+
+
 	ac.Init(4);
 	ac.Reset();
 	
@@ -151,21 +154,22 @@ bool GameManager::CheckForShot(void)
 		// wait to finish collecting
 		delay(10);
 		// Read the samples out of the FIFO
-		ac.ReadSamples();
-		// Stop collecting
-		// May have triggered again by now?
-		ac.Stop();
+		if (ac.ReadSamples())
+		{
+			// Stop collecting
+			// May have triggered again by now?
+			ac.Stop();
+			accelActive = false;
 		
-		// Get all limits
-		ac.getLimits();
+			// Get all limits
+			ac.getLimits();
+			
+			// clear out
+			ac.Reset();
+			//ac.Stop();
 		
-		// clear out
-		ac.Reset();
-		
-		// stop watching
-		accelActive = false;
-		
-		return true;
+			return true;
+		}
 	}
 		
 	return false;
@@ -208,8 +212,17 @@ void GameManager::Loop(void)
 					state.uiUpdateReq = true;
 				}
 				
+				// Mark time
+				timeoutStartTime = millis();
 				// Start timeout
 				shot = TIMEOUT;
+				
+				// Stop accel
+				//ac.Stop();
+				//accelActive = false;
+				
+				// show it
+				state.uiUpdateReq = true;
 			}
 		}
 	}
@@ -217,10 +230,14 @@ void GameManager::Loop(void)
 	// Wait for timer to complete
 	if (shot == TIMEOUT)
 	{
+		uint32_t currentTime = millis();
+		uint32_t time_diff = currentTime - timeoutStartTime;
+		
 		// check for expired timer
-		if (1)
+		if (time_diff > TIMEOUT_DURATION_MS)
 		{
 			shot = WAIT;
+			state.uiUpdateReq = true;
 		}
 	}
 	

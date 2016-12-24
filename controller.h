@@ -45,6 +45,7 @@ public:
 	
 	AccController();
 	
+	void SPI_Init(void);
 	void Init(int nSen);
 	void Reset(void);
 	void Start(void);
@@ -52,7 +53,7 @@ public:
 
 	bool Ready(void);
 	
-	void ReadSamples(void);
+	bool ReadSamples(void);
 	
 	void getLimits(void);
 	

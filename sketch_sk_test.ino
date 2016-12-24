@@ -46,10 +46,6 @@ void setup()
 	Serial.println("Starting");
 	Serial.println("Build: 12/19/16");
 	
-	//ac.Init(1);
-	//ac.Reset();
-	//ac.Start();
-	//state = AIDLE;
 	
 	gm.Init();
 

@@ -1,5 +1,6 @@
 
 #include "controller.h"
+#include <SPI.h>
 
 
 const uint8_t accelRange = 16;
@@ -21,6 +22,24 @@ const int CS_PINS[4] = {2, 14, 13, 10};
 
 AccController::AccController()
 {
+}
+
+void AccController::SPI_Init(void)
+{
+	int i;
+	
+	// start SPI
+	SPI.begin();
+	
+	// Set all CS high
+	for (i=0; i<MAX_ACCEL; i++)
+	{
+		pinMode(CS_PINS[i], OUTPUT);
+		digitalWrite(CS_PINS[i], HIGH);
+	}
+	
+	// settle
+	delay(100);
 }
 
 // set up all accels, don't start
@@ -90,9 +109,14 @@ void AccController::Reset(void)
 void AccController::Start(void)
 {
 	int i;
+	byte interrupts;
 	
 	for (i=0; i<nAcc; i++)
 	{
+		// read status first
+		interrupts = acc[i]->getInterruptSource();
+		
+		// enable trigger on activity
 		acc[i]->EnableTriggerMode(1,15);
 		acc[i]->ActivityINT(1);
 	}
@@ -120,20 +144,27 @@ bool AccController::Ready(void)
 	{
 		interrupts = acc[i]->getInterruptSource();
 		if (acc[i]->triggered(interrupts, ADXL345_ACTIVITY))
+		{
+			Serial.print("Act trigger on ch #");
+			Serial.print(i);
+			Serial.println("");
 			res = true;
+		}
 		delay(1);
 	}
 	
 	return res;
 }
 
-void AccController::ReadSamples(void)
+// return true if anyone had samples
+bool AccController::ReadSamples(void)
 {
 	bool triggered;
 	uint8_t nSamples;
 	uint8_t i,j;
 	double xyz[3];
 	double Gmag; 
+	bool anySamples = false;
 	
 	for (i=0; i<nAcc; i++)
 	{
@@ -142,7 +173,7 @@ void AccController::ReadSamples(void)
 		
 		fifo[i].valid = triggered;
 		
-		Serial.print("Act trigger #");
+		Serial.print("FIFO #");
 		Serial.print(i);
 		Serial.print(", trig = ");
 		Serial.print((int)triggered);
@@ -153,6 +184,8 @@ void AccController::ReadSamples(void)
 		
 		if (triggered)
 		{
+			anySamples = true;
+			
 			// this accel was triggered, read the samples
 			for (j=0; j<FIFO_SIZE; j++)
 			{
@@ -185,6 +218,8 @@ void AccController::ReadSamples(void)
 		// wait a bit
 		delay(1);
 	}
+	
+	return anySamples;
 }
 
 void AccController::getLimits(void)

@@ -22,6 +22,8 @@ enum shotState {DISABLED = 0, WAIT, TIMEOUT, PAUSED};
 #define DEFAULT_ROUNDS	5
 #define DEFAULT_SHOTS	10
 
+#define TIMEOUT_DURATION_MS 	3000
+
 
 
 struct gameState
@@ -69,6 +71,7 @@ public:
 	
 private:
 	
+	uint32_t timeoutStartTime;
 	
 	AccController ac;
 	
