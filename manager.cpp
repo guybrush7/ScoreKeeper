@@ -8,6 +8,10 @@ int missValue = -1;
 
 
 
+#if NUM_ACCEL > MAX_ACCEL
+#error "There aren't that many."
+#endif
+
 GameManager::GameManager()
 {
 	mode = IDLE;
@@ -21,7 +25,7 @@ void GameManager::Init(void)
 	ac.SPI_Init();
 
 
-	ac.Init(4);
+	ac.Init(NUM_ACCEL);
 	ac.Reset();
 	
 	
@@ -55,6 +59,7 @@ void GameManager::EnterGame(gameConfig initcfg)
 void GameManager::EnterTest(void)
 {
 	mode = TEST;
+	shot = DISABLED;
 }
 
 void GameManager::ExitMode(void)
@@ -209,14 +214,20 @@ void GameManager::Loop(void)
 				if (mode == GAME)
 				{
 					ScoreHit();
-					state.uiUpdateReq = true;
+					//state.uiUpdateReq = true;
+					
+					// Mark time
+					timeoutStartTime = millis();
+					// Start timeout
+					shot = TIMEOUT;
+				}
+				else if (mode == TEST)
+				{
+					// wait for user
+					shot = TEST_TRIG;
 				}
 				
-				// Mark time
-				timeoutStartTime = millis();
-				// Start timeout
-				shot = TIMEOUT;
-				
+				// Accel already stopped in CheckForShot()
 				// Stop accel
 				//ac.Stop();
 				//accelActive = false;
@@ -251,6 +262,10 @@ void GameManager::Loop(void)
 		}
 	}
 	
+	if (shot == TEST_TRIG)
+	{
+		// Nothing to do
+	}
 	
 	
 }
@@ -290,6 +305,17 @@ void GameManager::TogglePause(void)
 		shot = PAUSED;
 		state.uiUpdateReq = true;
 	}
+}
+
+void GameManager::ArmTest(void)
+{
+	if (mode == TEST)
+		if (shot == TEST_TRIG || shot == DISABLED)
+		{
+			Serial.println ("Test armed");
+			shot = WAIT;
+			state.uiUpdateReq = true;
+		}
 }
 
 

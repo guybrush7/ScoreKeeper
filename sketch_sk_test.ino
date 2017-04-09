@@ -1,4 +1,5 @@
 // ScoreKeeper
+// jrw
 
 #include <SimbleeForMobile.h>
 
@@ -22,9 +23,9 @@
 
 GameManager gm;
 
-enum state_t {AIDLE=0, ARMED, TRIGGERED};
+//enum state_t {AIDLE=0, ARMED, TRIGGERED};
 
-state_t state;
+//state_t state;
 
 uint8_t hText1;
 uint8_t hText2;
@@ -44,7 +45,7 @@ void setup()
 	Serial.begin(9600);
 
 	Serial.println("Starting");
-	Serial.println("Build: 12/19/16");
+	Serial.println("Build: 4/8/17");
 	
 	
 	gm.Init();
@@ -68,7 +69,11 @@ void loop() {
 	// handle ui updates
 	if (gm.state.uiUpdateReq)
 	{
-		updateGameScreen();
+		if (gm.mode == GAME || gm.mode == GAMEOVER)
+			updateGameScreen();
+		else if (gm.mode == TEST)
+			updateTestScreen();
+			
 		gm.state.uiUpdateReq = false;
 	}
 	
@@ -129,6 +134,44 @@ void updateGameScreen(void)
 	else if (gm.shot == PAUSED)
 	{
 		SimbleeForMobile.updateText(txtGameStatus, "PAUSED");
+		SimbleeForMobile.updateColor(txtGameStatus, DARK_YELLOW);
+	}
+
+}
+
+
+void updateTestScreen(void)
+{
+	float a;
+	
+	// update accel results
+	for (int i=0; i<NUM_ACCEL; i++)
+	{
+		a = gm.ac.lim[i].absMax;
+		
+		sprintf(str, "%d = %02d.%01d", i, int(a), int(10*(a - (int)a)));
+		SimbleeForMobile.updateText(txtTestRes[i], str);
+	}
+	
+	// mode
+	if (gm.shot == WAIT)
+	{
+		SimbleeForMobile.updateText(txtTestStatus, "SHOOT");
+		SimbleeForMobile.updateColor(txtTestStatus, GREEN);
+	}
+	else if (gm.shot == TEST_TRIG)
+	{
+		SimbleeForMobile.updateText(txtTestStatus, "HIT");
+		SimbleeForMobile.updateColor(txtTestStatus, RED);
+	}
+	else if (gm.shot == DISABLED)
+	{
+		SimbleeForMobile.updateText(txtTestStatus, "Waiting");
+		SimbleeForMobile.updateColor(txtTestStatus, BLUE);
+	}
+	else
+	{
+		SimbleeForMobile.updateText(txtGameStatus, "Error");
 		SimbleeForMobile.updateColor(txtGameStatus, DARK_YELLOW);
 	}
 
@@ -302,7 +345,25 @@ void createTestScreen()
 
 	SimbleeForMobile.beginScreen(WHITE, PORTRAIT);
 	
+	ytop += 30;
+	txtTestStatus = SimbleeForMobile.drawText(30, ytop, "Waiting", RED, 32);
+	
+	ytop += 20;
+	
+	for (int i=0; i<MAX_ACCEL; i++)
+	{
+		ytop += 30;
+		txtTestRes[i] = SimbleeForMobile.drawText(30, ytop, "n", BLACK, 20);
+	}
+	
+	ytop += 50;
+	bTestArm = SimbleeForMobile.drawButton(30,ytop, 100, "ARM", RED, BOX_TYPE);
 
+	ytop += 100;
+	bTestEnd = SimbleeForMobile.drawButton(30,ytop, 100, "End Test", BLACK, BOX_TYPE);
+
+	
+	
 	SimbleeForMobile.endScreen();
 	
 	uiIsReady = true;
@@ -322,6 +383,7 @@ void handleMainScreenEvents(event_t &event)
 	if (event.id == bMainTest && event.type == EVENT_RELEASE)
 	{
 		Serial.print("Start test\n");
+		gm.EnterTest();		
 		SimbleeForMobile.showScreen(TEST_SCREEN);
 		uiIsReady = false;
 	}
@@ -412,12 +474,39 @@ void handleGameScreenEvents(event_t &event)
 
 void handleTestScreenEvents(event_t &event)
 {
+	Serial.print("test event ");
+	Serial.print(event.id);
+	Serial.print(" ");
+	Serial.print("type ");
+	Serial.print(event.type);
+	Serial.print("\n");
 	
-	if (event.id == bGameNextPlayer && event.type == EVENT_RELEASE)
+	/*
+	Serial.print(txtTestStatus);
+	Serial.print("\n");
+	Serial.print(txtTestRes[0]);
+	Serial.print("\n");
+	Serial.print(txtTestRes[1]);
+	Serial.print("\n");
+	Serial.print(txtTestRes[2]);
+	Serial.print("\n");
+	Serial.print(txtTestRes[3]);
+	Serial.print("\n");
+	Serial.print(bTestArm);
+	Serial.print("\n");
+	Serial.print(bTestEnd);
+	Serial.print("\n");
+	*/
+	
+	if (event.id == bTestArm && event.type == EVENT_PRESS)
 	{
-		//SimbleeForMobile.showScreen(TEST_SCREEN);
+		// arm
+		gm.ArmTest();
+		
+		Serial.println("Test: arm");
+		
 	}
-	else if (event.id == bGameEnd && event.type == EVENT_RELEASE)
+	else if (event.id == bTestEnd && event.type == EVENT_PRESS)
 	{
 		gm.ExitMode();
 		SimbleeForMobile.showScreen(MAIN_SCREEN);

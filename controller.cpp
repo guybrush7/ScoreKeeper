@@ -119,6 +119,8 @@ void AccController::Start(void)
 		// enable trigger on activity
 		acc[i]->EnableTriggerMode(1,15);
 		acc[i]->ActivityINT(1);
+		
+		//acc[i]->printAllRegister();
 	}
 }
 
@@ -143,6 +145,12 @@ bool AccController::Ready(void)
 	for (i=0; i<nAcc; i++)
 	{
 		interrupts = acc[i]->getInterruptSource();
+		/*
+		Serial.print("Read interrupt: ");
+		Serial.print(interrupts);
+		Serial.println("");
+		*/
+		
 		if (acc[i]->triggered(interrupts, ADXL345_ACTIVITY))
 		{
 			Serial.print("Act trigger on ch #");

@@ -782,9 +782,12 @@ void ADXL345::FreeFallINT(bool status) {
 void ADXL345::ActivityINT(bool status) {
 	if(status) {
 		setInterrupt( ADXL345_INT_ACTIVITY_BIT,   1);
+		// No!, don't do this...
+		//writeTo(ADXL345_INT_ENABLE, ADXL345_INT_ACTIVITY_BIT);
 	}
 	else {
 		setInterrupt( ADXL345_INT_ACTIVITY_BIT,   0);
+		//writeTo(ADXL345_INT_ENABLE, 0);
 	}
 }
 void ADXL345::InactivityINT(bool status) {

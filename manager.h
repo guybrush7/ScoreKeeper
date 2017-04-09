@@ -8,7 +8,7 @@
 
 enum gameMode {IDLE = 0, TEST, GAME, GAMEOVER};
 
-enum shotState {DISABLED = 0, WAIT, TIMEOUT, PAUSED};
+enum shotState {DISABLED = 0, WAIT, TIMEOUT, PAUSED, TEST_TRIG};
 
 #define MAX_PLAYERS		4
 #define MAX_ROUNDS		10
@@ -23,6 +23,8 @@ enum shotState {DISABLED = 0, WAIT, TIMEOUT, PAUSED};
 #define DEFAULT_SHOTS	10
 
 #define TIMEOUT_DURATION_MS 	3000
+
+#define NUM_ACCEL 		4
 
 
 
@@ -52,12 +54,14 @@ public:
 	
 	// User input
 	void EnterGame(gameConfig initcfg);
+	void EnterTest(void);
 	void ExitMode();
-	void EnterTest();
 	void EndPlayer();
 	
 	// update ui
 	gameState GetState(void);
+	
+	void ArmTest(void);
 	
 	void Loop();
 	
@@ -68,12 +72,11 @@ public:
 	shotState shot;
 	gameConfig cfg;
 	gameMode mode;
+	AccController ac;
 	
 private:
 	
 	uint32_t timeoutStartTime;
-	
-	AccController ac;
 	
 	void InitRound(void);
 	void InitPlayer(void);

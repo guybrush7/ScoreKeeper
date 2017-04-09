@@ -2,6 +2,8 @@
 #ifndef _UI_HANDLES_H
 #define _UI_HANDLES_H
 
+// Only include in main file
+
 
 // Main
 
@@ -28,6 +30,12 @@ uint8_t bGamePause;
 
 
 // Test
+
+uint8_t txtTestStatus;
+uint8_t txtTestRes[4];
+uint8_t bTestArm;
+uint8_t bTestEnd;
+
 
 
 
